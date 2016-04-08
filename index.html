@@ -1,0 +1,127 @@
+<html>
+<head>
+<script src="utils.js"></script>
+<script src="suit.js"></script>
+<script src="rank.js"></script>
+<script src="handSolver.js"></script>
+<script src="deck.js"></script>
+<script src="actions.js"></script>
+<script>
+
+(function(){	
+	
+	function printState(prop){
+		console.log(state[prop]);
+		document.getElementById("stateString").innerHTML = JSON.stringify(state, null, " ");
+	}	
+	
+	window.state = {
+		tables: {},
+		players: {},
+		hands:{}
+	}
+	
+	window.addEventListener("load", function(){
+		
+		function addTable(){
+			var id = Actions.tables({type: "add"});
+			document.getElementById("tableSelect").insertAdjacentHTML("afterbegin", "<option>" + id + "</option>")
+			printState("tables");
+		}	
+		function addPlayer(){
+			var id = Actions.players({type: "add"});
+			document.getElementById("playerSelect").insertAdjacentHTML("afterbegin", "<option>" + id + "</option>");
+			printState("players");
+		}
+		function addPlayerToTable(){
+			var tableId = document.getElementById("tableSelect").value;
+			var playerId = document.getElementById("playerSelect").value;
+			Actions.tables({type: "addPlayer", payload: {tableId: tableId, playerId: playerId}});
+			printState("tables");
+		}
+		function addHand(){
+			var tableId = document.getElementById("tableSelect").value;
+			var id = Actions.hands({type: "add", payload: {tableId: tableId}});
+			document.getElementById("handSelect").insertAdjacentHTML("afterbegin", "<option>" + id + "</option>")
+			printState("hands");
+		}
+		function dealHand(){
+			var handId = document.getElementById("handSelect").value;
+			Actions.hands({type: "deal", payload: {handId: handId}});
+			printState("hands");
+		}
+		function flopHand(){
+			var handId = document.getElementById("handSelect").value;
+			Actions.hands({type: "flop", payload: {handId: handId}});
+			printState("hands");
+		}
+		function turnHand(){
+			var handId = document.getElementById("handSelect").value;
+			Actions.hands({type: "turn", payload: {handId: handId}});
+			printState("hands");
+		}
+		function riverHand(){
+			var handId = document.getElementById("handSelect").value;
+			Actions.hands({type: "river", payload: {handId: handId}});
+			printState("hands");
+		}
+		
+		document.getElementById("addTable").addEventListener("click", addTable);
+		document.getElementById("addPlayer").addEventListener("click", addPlayer);		
+		document.getElementById("addPlayerToTable").addEventListener("click", addPlayerToTable);		
+		document.getElementById("addHand").addEventListener("click", addHand);
+		document.getElementById("dealHand").addEventListener("click", dealHand);
+		document.getElementById("flopHand").addEventListener("click", flopHand);		
+		document.getElementById("turnHand").addEventListener("click", turnHand);		
+		document.getElementById("riverHand").addEventListener("click", riverHand);
+		
+		function replay(){
+			addTable();
+			addPlayer();
+			addPlayer();
+			addPlayer();
+			addPlayer();
+			addPlayer();
+			addPlayerToTable();
+			document.getElementById("playerSelect").selectedIndex++;
+			addPlayerToTable();
+			document.getElementById("playerSelect").selectedIndex++;
+			addPlayerToTable();
+			document.getElementById("playerSelect").selectedIndex++;
+			addPlayerToTable();
+			document.getElementById("playerSelect").selectedIndex++;
+			addPlayerToTable();
+			addHand();
+			dealHand();
+		}
+		
+		replay();
+	});
+})();
+</script>
+<style>
+	.half {
+		display: inline-block;
+		width: 49%;
+		vertical-align:top;
+	}
+</style>
+</head>
+<body>	
+	<div class="half">
+	<button id="addTable">Add Table</button>
+	<select id="tableSelect"></select></br>
+	<button id="addPlayer">Add Player</button>
+	<select id="playerSelect"></select></br>
+	<button id="addPlayerToTable">Add Player To Table</button></br>
+	<button id="addHand">Add Hand</button>
+	<select id="handSelect"></select></br>
+	<button id="dealHand">Deal Hand</button>
+	<button id="flopHand">Flop Hand</button>
+	<button id="turnHand">Turn Hand</button>
+	<button id="riverHand">River Hand</button>
+	</div>
+	<textarea id="stateString" rows="30" class="half">
+	</textarea>
+</body>
+</html>
