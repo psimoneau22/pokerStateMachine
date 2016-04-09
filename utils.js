@@ -8,9 +8,23 @@ var Utils = (function(){
 	function getId(prefix) {
 	  return prefix + "_" + s4() + s4();
 	}
+    
+    function nextWrap(arr, start, condition){
+        var count = 0;
+        var current = start >= arr.length - 1 ? 0 : start + 1;
+        while(count < arr.length) {
+            count++;
+            if(!condition || condition(arr[current])){
+                return arr[current];
+            }
+            current++;
+        }
+        return null;
+    }
 
 	return {
-		getId: getId
+		getId: getId,
+        nextWrap: nextWrap
 	}
 })();
 	

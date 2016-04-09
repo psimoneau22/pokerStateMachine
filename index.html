@@ -12,13 +12,17 @@
 	
 	function printState(prop){
 		console.log(state[prop]);
-		document.getElementById("stateString").innerHTML = JSON.stringify(state, null, " ");
+		document.getElementById("tableText").innerHTML = JSON.stringify(state.tables, null, " ");
+        document.getElementById("playerText").innerHTML = JSON.stringify(state.players, null, " ");
+        document.getElementById("handText").innerHTML = JSON.stringify(state.hands, null, " ");
+        document.getElementById("roundText").innerHTML = JSON.stringify(state.rounds, null, " ");
 	}	
 	
 	window.state = {
 		tables: {},
 		players: {},
-		hands:{}
+		hands:{},
+        rounds:{}
 	}
 	
 	window.addEventListener("load", function(){
@@ -44,6 +48,11 @@
 			var id = Actions.hands({type: "add", payload: {tableId: tableId}});
 			document.getElementById("handSelect").insertAdjacentHTML("afterbegin", "<option>" + id + "</option>")
 			printState("hands");
+            
+            var roundSelect = document.getElementById("roundSelect");
+            
+            roundSelect.insertAdjacentHTML("afterbegin", "<option>" + state.hands[id].rounds[0] + "</option>")
+            document.getElementById("roundSelect").selectedIndex = 0;
 		}
 		function dealHand(){
 			var handId = document.getElementById("handSelect").value;
@@ -64,6 +73,36 @@
 			var handId = document.getElementById("handSelect").value;
 			Actions.hands({type: "river", payload: {handId: handId}});
 			printState("hands");
+		} 
+        function addRound(){
+			var handId = document.getElementById("handSelect").value;
+			Actions.rounds({type: "add", payload: {handId: handId}});
+			printState("rounds");
+		}       
+        function fold(){
+			var roundId = document.getElementById("roundSelect").value;
+			Actions.rounds({type: "fold", payload: {roundId: roundId}});
+			printState("rounds");
+		}
+        function check(){
+			var roundId = document.getElementById("roundSelect").value;
+			Actions.rounds({type: "check", payload: {roundId: roundId}});
+			printState("rounds");
+		}
+        function bet(){
+			var roundId = document.getElementById("roundSelect").value;
+			Actions.rounds({type: "bet", payload: {roundId: roundId}});
+			printState("rounds");
+		}
+        function call(){
+			var roundId = document.getElementById("roundSelect").value;
+			Actions.rounds({type: "call", payload: {roundId: roundId}});
+			printState("rounds");
+		}
+        function allIn(){
+			var roundId = document.getElementById("roundSelect").value;
+			Actions.rounds({type: "allIn", payload: {roundId: roundId}});
+			printState("rounds");
 		}
 		
 		document.getElementById("addTable").addEventListener("click", addTable);
@@ -74,6 +113,12 @@
 		document.getElementById("flopHand").addEventListener("click", flopHand);		
 		document.getElementById("turnHand").addEventListener("click", turnHand);		
 		document.getElementById("riverHand").addEventListener("click", riverHand);
+        document.getElementById("addRound").addEventListener("click", addRound);
+        document.getElementById("fold").addEventListener("click", fold);
+        document.getElementById("check").addEventListener("click", check);
+        document.getElementById("bet").addEventListener("click", bet);
+        document.getElementById("call").addEventListener("click", call);
+        document.getElementById("allIn").addEventListener("click", allIn);
 		
 		function replay(){
 			addTable();
@@ -92,7 +137,8 @@
 			document.getElementById("playerSelect").selectedIndex++;
 			addPlayerToTable();
 			addHand();
-			dealHand();
+			//dealHand();
+            //addRound();
 		}
 		
 		replay();
@@ -100,28 +146,52 @@
 })();
 </script>
 <style>
-	.half {
+	.thirty {
 		display: inline-block;
-		width: 49%;
+		width: 20%;
 		vertical-align:top;
 	}
+    .seventy {
+		display: inline-block;
+		width: 75%;
+		vertical-align:top;
+	}
+    .area {
+        display: block;
+        width: 100%;
+        height: 200px;
+    }
 </style>
 </head>
 <body>	
-	<div class="half">
-	<button id="addTable">Add Table</button>
-	<select id="tableSelect"></select></br>
-	<button id="addPlayer">Add Player</button>
+	<div class="thirty">
+	
+	<select id="tableSelect"></select></br>	
 	<select id="playerSelect"></select></br>
+    <select id="handSelect"></select></br>
+    <select id="roundSelect"></select></br>
+    
+    <button id="addTable">Add Table</button>
+    <button id="addPlayer">Add Player</button>
 	<button id="addPlayerToTable">Add Player To Table</button></br>
 	<button id="addHand">Add Hand</button>
-	<select id="handSelect"></select></br>
-	<button id="dealHand">Deal Hand</button>
-	<button id="flopHand">Flop Hand</button>
-	<button id="turnHand">Turn Hand</button>
-	<button id="riverHand">River Hand</button>
-	</div>
-	<textarea id="stateString" rows="30" class="half">
-	</textarea>
+	
+	<button id="dealHand">Deal Hand</button></br>
+	<button id="flopHand">Flop Hand</button></br>
+	<button id="turnHand">Turn Hand</button></br>
+	<button id="riverHand">River Hand</button></br>
+    <button id="addRound">Add Round</button></br>
+    <button id="fold">Fold</button></br>
+    <button id="check">Check</button></br>
+    <button id="bet">Bet</button></br>
+    <button id="call">Call</button></br>
+    <button id="allIn">All In</button></br>
+	</div>  
+    <div class="seventy">  
+	<textarea id="tableText" rows="30" class="area" ></textarea>
+    <textarea id="playerText" rows="30" class="area"></textarea>
+    <textarea id="handText" rows="30" class="area" ></textarea>
+    <textarea id="roundText" rows="30" class="area" ></textarea>
+	<div>
 </body>
 </html>
