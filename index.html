@@ -17,6 +17,16 @@
         document.getElementById("handText").innerHTML = JSON.stringify(state.hands, null, " ");
         document.getElementById("roundText").innerHTML = JSON.stringify(state.rounds, null, " ");
 	}	
+    
+    function getHand(){
+        var tableId = document.getElementById("tableSelect").value;
+        return state.hands[state.tables[tableId].handId];        
+    }
+    
+    function getRound(){
+        var rounds = getHand().rounds;
+        return state.rounds[rounds[rounds.length -1]];
+    }
 	
 	window.state = {
 		tables: {},
@@ -79,29 +89,28 @@
 			Actions.rounds({type: "add", payload: {handId: handId}});
 			printState("rounds");
 		}       
-        function fold(){
-			var roundId = document.getElementById("roundSelect").value;
-			Actions.rounds({type: "fold", payload: {roundId: roundId}});
+        function fold(){			
+			Actions.rounds({type: "fold", payload: {roundId: getRound()._id}});
 			printState("rounds");
 		}
         function check(){
 			var roundId = document.getElementById("roundSelect").value;
-			Actions.rounds({type: "check", payload: {roundId: roundId}});
+			Actions.rounds({type: "check", payload: {roundId: getRound()._id}});
 			printState("rounds");
 		}
         function bet(){
 			var roundId = document.getElementById("roundSelect").value;
-			Actions.rounds({type: "bet", payload: {roundId: roundId}});
+			Actions.rounds({type: "bet", payload: {roundId: getRound()._id,  amount: 25}});
 			printState("rounds");
 		}
         function call(){
 			var roundId = document.getElementById("roundSelect").value;
-			Actions.rounds({type: "call", payload: {roundId: roundId}});
+			Actions.rounds({type: "call", payload: {roundId: getRound()._id}});
 			printState("rounds");
 		}
         function allIn(){
 			var roundId = document.getElementById("roundSelect").value;
-			Actions.rounds({type: "allIn", payload: {roundId: roundId}});
+			Actions.rounds({type: "allIn", payload: {roundId: getRound()._id}});
 			printState("rounds");
 		}
 		
@@ -137,8 +146,6 @@
 			document.getElementById("playerSelect").selectedIndex++;
 			addPlayerToTable();
 			addHand();
-			//dealHand();
-            //addRound();
 		}
 		
 		replay();

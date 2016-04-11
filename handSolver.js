@@ -1,89 +1,145 @@
-var HandSolver = (function(){
-	function determineWinner(hand){
+var HandSolver = (function() {
+    
+    function getResults(hand) {
+        var rankResults = determineWinners(hand);
+        var result = {};
+        rankResults.forEach(function(group){
+            var sorted = group.sort(function(a, b){
+                return hand.players.find(function(player){return player._id == b.playerId}).potential - hand.players.find(function(player){return player._id == a.playerId}).potential; 
+            }).map(function(item){ 
+                return Object.assign({}, item, { potential: hand.players.find(function(player){return player._id == item.playerId}).potential}) 
+            });
+            
+            while(sorted.length > 0){
+                
+                var sharedPot = Math.floor(sorted[0].potential / sorted.length);
+                sorted.forEach(function(handResult){
+                    handResult.potential -= sorted[0].potential;
+                    
+                    if(!result[handResult.playerId]){
+                        result[handResult.playerId] = Object.assign({}, handResult, {winnings: 0});
+                    }
+                    
+                    result[handResult.playerId].winnings += sharedPot;
+                });
+                sorted.shift();
+            }
+        });
+        return result;
+    }
+    
+	function determineWinners(hand) {
 		var result = [];
-		for(var playerId in hand.players) {
-			result.push({ playerId: playerId, score: getHandRank(hand.cards.concat(hand.players[playerId].cards)) });
+		for(var player of hand.players) {
+            if(player.hasFolded) {
+                continue;
+            }
+			result.push(Object.assign({}, { playerId: player._id }, solveHand(hand.cards.concat(player.cards))));
 		}
-		result.sort(function(a, b){
-			return a.score - b.score;
+		result = result.sort(function(a, b){
+			return b.score - a.score;
 		});
-		return result;
+        
+        var prevScore = 0;
+        result = result.reduce(function(prev, curr){            
+            if(prevScore == curr.score){
+                prev[prev.length - 1].push(curr);
+            }
+            else {
+                 prev.push([curr]);
+            }
+            prevScore = curr.score;
+            return prev;
+        }, []);      
+        
+        return result;
 	}
 	
-	function getHandRank(cards){
+    
+    // todo:
+    //  - deal with ties (kickers, second kickers, etc)
+    //  - straight flush
+    //  - straight with low ace
+	function solveHand(cards){
 		cards.sort(function(a, b){
-			return (a.rank * 10 + a.suit) - (b.rank * 10 + a.suit);
+			return (b.rank * 10 + b.suit) - (a.rank * 10 + a.suit);
 		});
 		
 		var handResult = straightFlush(cards);
-		if(handRank){
-			return 90 * 1000 + handResult;
+		if(handResult) {
+			return {
+                score: 90 * 1000 + handResult,
+                name: "straight flush" 
+            }
 		}
 		
 		handResult = fourOfAKind(cards);
 		if(handResult){
-			return 80 * 1000 + handResult;
+			return {
+                score: 80 * 1000 + handResult,
+                name: "four of a kind"
+            }
 		}
 		
 		handResult = fullHouse(cards);
 		if(handResult){
-			return 70 * 1000 + handResult.high * 100 + handResult.low;
+			return {
+                score: 70 * 1000 + handResult.high * 100 + handResult.low,
+                name: "full house" 
+            }
 		}
 		
 		handResult = flush(cards);
 		if(handResult){
-			return 60 * 1000 + handResult;
+			return {
+                score: 60 * 1000 + handResult,
+                name: "flush"
+            }
 		}
 		
 		handResult = straight(cards);
 		if(handResult){
-			return 50 * 1000 + handResult;
+			return {
+                score: 50 * 1000 + handResult,
+                name: "straight"
+            }
 		}
 		
 		handResult = threeOfAKind(cards);
 		if(handResult){
-			return 40 * 1000 + handResult;
+			return {
+                score: 40 * 1000 + handResult,
+                name: "three of a kind" 
+            }
 		}
 		
 		handResult = twoPair(cards);
 		if(handResult){
-			return 30 * 1000 + handResult.high * 100 + handResult.low;;
+			return {
+                score: 30 * 1000 + handResult.high * 100 + handResult.low,
+                name: "two pair" 
+            }
 		}
 		
 		handResult = pair(cards);
 		if(handResult){
-			return 20 * 1000 + handResult;
+			return {
+                score: 20 * 1000 + handResult,
+                name: "pair"
+            }
 		}
 		
 		handResult = highCard(cards);
-		if(handResult){
-			return 10 * 1000 + handResult;
+		if(handResult) {
+			return {
+                score: 10 * 1000 + handResult,
+                name: "high card" 
+            }
 		}
 	}
 	
 	function straightFlush(cards){
-		var prevCard = {rank: 0, suit: 0};
-		var count = 1;		
-		for(var i = 0; i < cards.length; i++){
-			var card = cards[i];
-			if(card.rank == prevCard.rank - 1 && card.suit == prevCard.suit){
-				count++;
-			}
-			else if(card.rank != prevCard.rank && card.suit != prevCard.suit){
-				count = 1;
-			}
-			
-			if(count == 5){
-				return card.rank + 4;				
-			}
-			if(i > count + 1){
-				return 0;
-			}
-			
-			prevRank = card.rank;
-		};
-		
-		return 0;
+		return false;
 	}
 	
 	function xOfAKind(x){
@@ -94,13 +150,14 @@ var HandSolver = (function(){
 					if(card.rank == item.rank){
 						return prev + 1;
 					}
-				}, 1);
+                    return prev;
+				}, 0);
 				if(count >= x){
 					return card.rank;
 				}
 			};
 			
-			return 0;
+			return false;
 		}
 	}
 	
@@ -111,14 +168,14 @@ var HandSolver = (function(){
 	function xOfAKindYofAKind(x, y){
 	
 		return function(cards){
-			var highRank = xOfAKind(x)(cards);
-			if(highRank){
+			var xOfAKindResultRank = xOfAKind(x)(cards);
+			if(xOfAKindResultRank){
 				var cardsForLowCheck = cards.filter(function(card){
-					return card.rank != high.rank;
+					return card.rank != xOfAKindResultRank.high;
 				});
-				var lowRank = xOfAKind(y)(cardsForLowCheck);
-				if(lowRank) {
-					return { high: highRank, low: lowRank }
+				var yOfAKindResultRank = xOfAKind(y)(cardsForLowCheck);
+				if(yOfAKindResultRank) {
+					return { high: xOfAKindResultRank, low: yOfAKindResultRank }
 				}
 			}
 			return 0;
@@ -141,7 +198,8 @@ var HandSolver = (function(){
 				if(card.suit == item.suit){
 					return prev + 1;
 				}
-			}, 1);
+                return prev;
+			}, 0);
 			
 			if(count >= 5){
 				return card.rank;
@@ -149,7 +207,7 @@ var HandSolver = (function(){
 			flushTrack[card.suit] = count;
 		};	
 		
-		return 0;
+		return false;
 	}
 	
 	function straight(cards){
@@ -173,7 +231,7 @@ var HandSolver = (function(){
 			prevRank = card.rank;
 		};
 		
-		return 0;
+		return false;
 	}
 	
 	function threeOfAKind(cards){
@@ -193,7 +251,8 @@ var HandSolver = (function(){
 	}
 	
 	return {
-		solveHand: getHandRank,
-		determineWinner: determineWinner
+		solveHand: solveHand,
+		determineWinner: determineWinners,
+        getResults: getResults
 	}
 })();

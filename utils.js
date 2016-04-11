@@ -11,14 +11,17 @@ var Utils = (function(){
     
     function nextWrap(arr, start, condition){
         var count = 0;
-        var current = start >= arr.length - 1 ? 0 : start + 1;
-        while(count < arr.length) {
-            count++;
+        
+        do {
+            var current = start >= arr.length - 1 ? 0 : start + 1;            
             if(!condition || condition(arr[current])){
                 return arr[current];
             }
+            count++;
             current++;
         }
+        while(count < arr.length);
+        
         return null;
     }
 

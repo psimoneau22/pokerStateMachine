@@ -6,11 +6,11 @@ var Actions = (function(){
 				var id = Utils.getId("tbl");
 				var table = state.tables[id] = {
 					_id: id,
-					players: [],
-					status: "open",
+                    handId: null,
+                    status: "open",
 					blind: 10,
-					dealer: 0,
-					hand: null
+					dealer: 0,					
+					players: []					
 				}
 				return table._id;
 			case "addPlayer":
@@ -51,13 +51,15 @@ var Actions = (function(){
                     tableId: table._id,
 					status: "pending",                    					
 					rounds: [],
+                    cards: [],
 					players: table.players.filter(handEligible).map(function(playerId) {
                         return {
                             _id: playerId,
                             cards: [],
                             bet: 0,
                             hasFolded: false,
-                            isAllIn: false
+                            isAllIn: false,
+                            potential: 0
                         }
 					}),
 					deck: []
@@ -100,14 +102,23 @@ var Actions = (function(){
                 var hand = state.hands[action.payload.handId];
                 var player = getPlayer(hand, action.payload.playerId); 
                 player.bet += action.payload.amount;
+                player.potential += action.payload.potential;
+                break;
             case "foldPlayer":
                 var hand = state.hands[action.payload.handId];
                 var player = getPlayer(hand, action.payload.playerId); 
                 player.hasFolded = true;
+                break;
             case "close":
                 var hand = state.hands[action.payload.handId];
                 hand.status = "closed";
-                // do transfers
+                var results = HandSolver.getResults(hand);
+                for(var playerId in results){
+                    players({ type: "transferTo", payload: { playerId: playerId, amount: results[playerId].winnings }});
+                }
+                hand.result = results;
+                hands({type: "add", payload: { tableId: hand.tableId }});
+                break;
             case "next":
                 var hand = state.hands[action.payload.handId];
                 var action = { payload: { handId: hand._id }};
@@ -122,37 +133,53 @@ var Actions = (function(){
                         action.type = "turn";
                         break;
                     case "turn":
-                        action.type = "deal";
+                        action.type = "river";
                         break;
                     case "river":
-                        action.type = "river";
+                        action.type = "close";
                         break;
                     default :
                         action.type = "close";
                 }
                 hands(action);
+                break;
 			default :			
 				return state;
 		}
 	}
     
     function rounds(action){
-        var next = function(roundId){
-            var round = state.rounds[roundId];
-            var hand = state.hands[round.handId];
-            var nextPlayer = Utils.nextWrap(round.players, round.players.findIndex(function(roundPlayer){
-                return roundPlayer._id == round.actionPlayerId;
-            }), function(roundPlayer){
+        var playerNeedsTurn = function(roundId) {            
+            return function(roundPlayer){
+                var round = state.rounds[roundId];
+                var hand = state.hands[round.handId];
                 var handPlayer = hand.players.find(function(handPlayer) {
                     return handPlayer._id == roundPlayer._id
                 });
-                
+
                 var maxBet = getMaxBet(roundId);
-                
+
                 // if everyone has folded, went all in or called, then we are done with the betting round
-                return !handPlayer.hasFolded && !handPlayer.isAllIn && handPlayer.bet != maxBet; 
-            });
-            
+                // except for the big blind, they get the chance to bet again even if they are even with current max bet
+                var result = !handPlayer.hasFolded && 
+                            !handPlayer.isAllIn && 
+                            (
+                                roundPlayer.bet != maxBet || 
+                                roundPlayer.isBlind ||
+                                !roundPlayer.hasBet
+                            )
+                
+                if(roundPlayer.isBlind){
+                    roundPlayer.isBlind = false;
+                }
+                
+                return result;
+            }
+		}
+        
+        var next = function(roundId){
+            var round = state.rounds[roundId];
+            var nextPlayer = Utils.nextWrap(round.players, round.players.indexOf(currentPlayer(round._id)), playerNeedsTurn(roundId));            
             if(nextPlayer == null) {
                 return rounds({type: "close", payload:{ roundId: roundId }});
             }
@@ -176,6 +203,19 @@ var Actions = (function(){
                 return roundPlayer._id == playerId;
             });
         }
+        
+        // after a bet/call if anyone is currently 'all-in', we need
+        // to track the potential winnings of that player by adding the amount
+        // of the next player's call/bet up to the amount that the 'all-in'
+        // player is in for
+        var setPotential = function(bettingPlayer, round) {  
+            
+            round.players.forEach(function(player){
+                player.potential = round.players.reduce(function(prev, curr) {
+                    return prev + Math.min(curr.bet, player.bet);
+                }, 0)                
+            });
+        }
             
         switch(action.type){
 			case "add":
@@ -189,7 +229,10 @@ var Actions = (function(){
                 }).map(function(handPlayer) {
                     return { 
                         _id: handPlayer._id,
-                        bet: 0
+                        bet: 0,
+                        potential: 0,
+                        isBlind: false,
+                        hasBet: false
                     };
                 });
                 
@@ -201,15 +244,15 @@ var Actions = (function(){
 				var round = state.rounds[id] = {
 					_id: id,
                     handId: hand._id,
-					status: "open",          
-					players: roundPlayers,
-                    actionPlayerId: actionPlayerId
+					status: "open",
+                    actionPlayerId: actionPlayerId,          
+					players: roundPlayers,                    
 				};
                 
                 // blinds
                 if(Object.keys(state.rounds).length == 1) {
                     rounds({type: "bet", payload: { roundId: round._id, amount: table.blind }});
-                    rounds({type: "bet", payload: { roundId: round._id, amount: table.blind }});
+                    rounds({type: "bet", payload: { roundId: round._id, amount: table.blind, isBlind: true }});   
                 }
                 
 				return round._id;
@@ -219,23 +262,33 @@ var Actions = (function(){
                 next(round._id);
                 break;
             case "check":
+                var round = state.rounds[action.payload.roundId];
+                var player = currentPlayer(action.payload.roundId);
+                player.hasBet = true;
                 next(action.payload.roundId);
                 break;
             case "call":
                 var round = state.rounds[action.payload.roundId];
                 var player = currentPlayer(action.payload.roundId);
+                player.hasBet = true;
                 player.bet += players({ type: "transferFrom", payload: { playerId: round.actionPlayerId, amount: getMaxBet(round._id) - player.bet}});
+                setPotential(player, round);                
                 next(round._id);
                 break;
             case "bet":
                 var round = state.rounds[action.payload.roundId];
                 var player = currentPlayer(action.payload.roundId);
-                player.bet += players({ type: "transferFrom", payload: { playerId: round.actionPlayerId, amount: getMaxBet(round._id) + action.payload.amount}});
+                player.hasBet = true;
+                player.bet += players({ type: "transferFrom", payload: { playerId: round.actionPlayerId, amount: getMaxBet(round._id) - player.bet + action.payload.amount}});
+                player.isBlind = action.payload.isBlind || player.isBlind;
+                setPotential(player, round);                
                 next(round._id);
                 break;
             case "allIn":
                 var round = state.rounds[action.payload.roundId];
-                currentPlayer(action.payload.roundId).bet += players({ type: "transferAll", payload: { playerId: round.actionPlayerId }});
+                var player = currentPlayer(action.payload.roundId);
+                player.bet += players({ type: "transferAll", payload: { playerId: round.actionPlayerId }});
+                setPotential(player, round);
                 next(round._id);
                 break;
             case "close":
@@ -244,7 +297,7 @@ var Actions = (function(){
                 
                 // transfer from round bets to hand pot and track 
                 round.players.forEach(function(roundPlayer){
-                    hands({type: "addPlayerBet", payload: { handId: round.handId, playerId: roundPlayer._id, amount: roundPlayer.bet }});
+                    hands({type: "addPlayerBet", payload: { handId: round.handId, playerId: roundPlayer._id, amount: roundPlayer.bet, potential: roundPlayer.potential }});
                 });
                 
                 // go to the next state in the hand
@@ -276,12 +329,17 @@ var Actions = (function(){
                 player.status = "lobby";
                 player.currentTableId = null;
                 break;
+            case "transferTo":					
+				var player = state.players[action.payload.playerId];                
+                player.coins += action.payload.amount;
+                break;
             case "transferFrom":					
 				var player = state.players[action.payload.playerId];
                 if(player.coins >= action.payload.amount){
                     player.coins -= action.payload.amount;
                     return action.payload.amount;  
                 }
+                break;
             case "transferAll":					
 				var player = state.players[action.payload.playerId];
                 var coins = player.coins;
