@@ -1,20 +1,45 @@
 var HandSolver = (function() {
     
+    function findPlayerById(hand, id){
+        return hand.players.find(function(player){
+            return player._id == id;
+        });
+    }
+    
     function getResults(hand) {
+        
         var rankResults = determineWinners(hand);
+        var pot = hand.players.reduce(function(total, player){ return total + player.bet}, 0);
         var result = {};
-        rankResults.forEach(function(group){
+        
+        // loop through each winning group, players are grouped by hand rank
+        // until the entire pot is dispersed
+        for(group of rankResults){
+            
+            // sort the winners for this group by thier pot potential
+            // we will disperse least pot potential first, then repeat 
+            // until the pot is dispersed
             var sorted = group.sort(function(a, b){
-                return hand.players.find(function(player){return player._id == b.playerId}).potential - hand.players.find(function(player){return player._id == a.playerId}).potential; 
+                var bPotential = findPlayerById(hand, b.playerId).potential;
+                var aPotential = findPlayerById(hand, a.playerId).potential;
+                return bPotential - aPotential;
             }).map(function(item){ 
-                return Object.assign({}, item, { potential: hand.players.find(function(player){return player._id == item.playerId}).potential}) 
+                return Object.assign({}, item, { potential: findPlayerById(hand, item.playerId).potential}) 
             });
             
+            // loop through each player in this group (for ties), and disperse their pot
+            // potential divided by the number of players in the tie/group, 
+            // each player in the may have different pot potentials            
             while(sorted.length > 0){
+                var amountToDisperseForTie = sorted[0].potential;
+                var sharedPot = Math.floor(amountToDisperseForTie / sorted.length);
                 
-                var sharedPot = Math.floor(sorted[0].potential / sorted.length);
+                // fractions that cannot be dispersed are discarded                
+                pot -= amountToDisperseForTie;                
+                
+                // disperse
                 sorted.forEach(function(handResult){
-                    handResult.potential -= sorted[0].potential;
+                    handResult.potential -= amountToDisperseForTie;
                     
                     if(!result[handResult.playerId]){
                         result[handResult.playerId] = Object.assign({}, handResult, {winnings: 0});
@@ -22,9 +47,21 @@ var HandSolver = (function() {
                     
                     result[handResult.playerId].winnings += sharedPot;
                 });
-                sorted.shift();
+                
+                // remove players who have had their pot potential dispersed
+                // and move on to other players who had higher pot potentials
+                // in the tie group
+                sorted = sorted.filter(function(handResult){
+                    return handResult.potential > 0;
+                });
             }
-        });
+            
+            // stop looking at winners after everything is dispersed
+            if(pot == 0){
+                break;
+            }
+        }        
+        
         return result;
     }
     
@@ -57,7 +94,7 @@ var HandSolver = (function() {
 	
     
     // todo:
-    //  - deal with ties (kickers, second kickers, etc)
+    //  - deal with ties (kickers, second kickers, etc), need to handle weighting out to 5 cards
     //  - straight flush
     //  - straight with low ace
 	function solveHand(cards){
@@ -171,7 +208,7 @@ var HandSolver = (function() {
 			var xOfAKindResultRank = xOfAKind(x)(cards);
 			if(xOfAKindResultRank){
 				var cardsForLowCheck = cards.filter(function(card){
-					return card.rank != xOfAKindResultRank.high;
+					return card.rank != xOfAKindResultRank;
 				});
 				var yOfAKindResultRank = xOfAKind(y)(cardsForLowCheck);
 				if(yOfAKindResultRank) {
@@ -239,7 +276,7 @@ var HandSolver = (function() {
 	}
 	
 	function twoPair(cards){
-		return xOfAKindYofAKind(3, 2)(cards);
+		return xOfAKindYofAKind(2, 2)(cards);
 	}
 	
 	function pair(cards){

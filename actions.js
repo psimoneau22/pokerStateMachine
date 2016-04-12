@@ -32,6 +32,23 @@ var Actions = (function(){
 	}
 	
 	function hands(action){
+        
+        function printResults(hand, results){
+            var printCards = function(cards){
+                return cards.forEach(function(card){
+                    console.log(card.rank + ":" + card.suit);
+                }); 
+            };
+            
+            printCards(hand.cards);
+            hand.players.forEach(function(player){
+                console.log("playerId:" + player._id); 
+                printCards(player.cards); 
+            });
+            Object.keys(results).forEach(function(winnerId){
+                console.log("winner:" + winnerId + ", hand:" + results[winnerId].name + ", winnings:" + results[winnerId].winnings);
+            });         
+        }
         var handEligible = function(playerId){
             return state.players[playerId].coins > state.tables[state.players[playerId].currentTableId].blind * 2;
         }
@@ -116,7 +133,8 @@ var Actions = (function(){
                 for(var playerId in results){
                     players({ type: "transferTo", payload: { playerId: playerId, amount: results[playerId].winnings }});
                 }
-                hand.result = results;
+                hand.result = results;  
+                printResults(hand, results);              
                 hands({type: "add", payload: { tableId: hand.tableId }});
                 break;
             case "next":
